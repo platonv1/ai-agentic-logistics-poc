@@ -23,10 +23,12 @@ export default function DispatchBoard({
   initialOrders,
   initialDrivers,
   initialEventLog,
+  displayName,
 }: {
   initialOrders: Order[];
   initialDrivers: Driver[];
   initialEventLog: EventLogEntry[];
+  displayName: string;
 }) {
   const router = useRouter();
   const [selectedOrderId, setSelectedOrderId] = useState(
@@ -58,9 +60,30 @@ export default function DispatchBoard({
     }
   }
 
+  async function handleLogout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.push("/dispatch");
+  }
+
   return (
     <main className="mx-auto max-w-6xl px-6 py-10 flex flex-col gap-8">
       <header className="flex flex-col gap-1">
+        <div className="flex items-center justify-between">
+          <span className="w-fit rounded-full border border-amber-500 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-amber-500">
+            Internal tool — staff only
+          </span>
+          <div className="flex items-center gap-3 text-sm text-gray-500">
+            <span>
+              Signed in as <span className="font-medium">{displayName}</span>
+            </span>
+            <button
+              onClick={handleLogout}
+              className="rounded border border-gray-300 px-2.5 py-1 text-xs font-medium"
+            >
+              Log out
+            </button>
+          </div>
+        </div>
         <h1 className="text-2xl font-semibold">Dispatch Console</h1>
         <p className="text-sm text-gray-500">
           Live agentic dispatch for last-mile delivery — simulate an exception

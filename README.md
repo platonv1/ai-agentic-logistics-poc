@@ -13,13 +13,17 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000). No environment variables are
-required — the app runs fully interactively out of the box using the built-in mock
-LLM provider (see [Mock provider](#mock-provider-and-why-it-exists) below).
+required for the customer-facing side — it runs fully interactively out of the box
+using the built-in mock LLM provider (see [Mock provider](#mock-provider-and-why-it-exists)
+below).
 
-- `/dispatch` — the ops dashboard: shipment board, a "Simulate exception" control, an
-  "Add new order & dispatch" control, and a live agent activity log.
 - `/track/[orderId]` — the customer-facing tracking page and support chat, e.g.
-  `/track/ord-1001`.
+  `/track/ord-1001`. Fully public, no login.
+- `/dispatch` → `/dispatch/console` — the ops dashboard: shipment board, a
+  "Simulate exception" control, an "Add new order & dispatch" control, and a live
+  agent activity log. Gated behind a staff login (see
+  [Authentication](#authentication) below) — requires a one-time `JWT_SECRET`
+  setup step even in mock mode (see `USER-GUIDE.md`).
 
 ## The three agents
 
@@ -35,13 +39,29 @@ reasoning trace to the client — nothing is scripted client-side. There's
 intentionally no agent framework (LangChain, etc.) here: three agents each making one
 structured LLM call don't need one.
 
+## Roadmap
+
+- **Now (this POC):** simulated fleet/orders, dispatcher dashboard with the 3 agents
+  running live LLM reasoning against mock data, customer chat surface.
+- **Next (0–3 mo, MVP):** real order/webhook ingestion, persistent store, human-in-the-loop
+  approval queue for agent actions, basic analytics on agent accuracy/override rate.
+- **Later (3–6 mo):** confidence-tiered autonomy with guardrails, multi-agent
+  orchestration (planner + specialists), TMS/WMS integrations, SLA-based escalation.
+- **Later+ (6–12 mo):** predictive agents (pre-empt exceptions from weather/traffic
+  signals), fleet-wide optimization agent, feedback-driven self-improvement, pluggable
+  LLM-provider marketplace.
+
 ## Architecture
 
 ```
 lib/data.ts   — seed data (drivers, orders, event log, chat) + an in-memory store
 lib/llm.ts    — provider-agnostic LLM client (gemini | ollama | mock)
+lib/auth.ts   — prototype staff/driver accounts + JWT sign/verify
+proxy.ts      — route guard: redirects/401s unauthenticated dispatch access
 app/api/agents/{exceptions,dispatch,chat}/route.ts — the three agents
-app/dispatch/page.tsx + DispatchBoard.tsx          — ops dashboard
+app/api/auth/{login,logout}/route.ts               — staff/driver sign-in
+app/dispatch/page.tsx + LoginForm.tsx              — staff sign-in page
+app/dispatch/console/page.tsx + DispatchBoard.tsx  — ops dashboard (auth required)
 app/track/[orderId]/page.tsx + TrackingChat.tsx    — customer tracking + chat
 ```
 
@@ -63,6 +83,25 @@ routes shared state with each other but not with the dashboard page. `globalThis
 the standard fix (the same pattern used for Prisma-client singletons in Next.js
 apps): it guarantees exactly one store per Node process regardless of which bundle
 touched it first.
+
+## Authentication
+
+`/dispatch/console` is a real, staff/driver-only surface — not just a label. It's
+guarded by a JWT session, checked in `proxy.ts` (Next.js's route-guard file
+convention) before the page or the two state-mutating agent routes
+(`/api/agents/exceptions`, `/api/agents/dispatch`) are allowed to run. No session →
+redirect to `/dispatch` (pages) or a `401` (API routes).
+
+- **Sign-in:** `app/dispatch/page.tsx` → `POST /api/auth/login` → sets an
+  `httpOnly` JWT cookie via `lib/auth.ts`.
+- **Accounts:** two hardcoded prototype accounts (`staff` / `staff123`,
+  `driver` / `driver123`, see `lib/auth.ts`) — no user database, consistent with
+  this POC's design. Documented in `USER-GUIDE.md`, not meant to resemble real
+  credential storage.
+- **Setup:** requires a `JWT_SECRET` in `.env.local` (a locally generated random
+  string, not a third-party key — see `.env.example`). This is the one part of the
+  app that isn't zero-setup; `/track/[orderId]` and `/api/agents/chat` stay fully
+  public and require nothing.
 
 ## How the agent logic works
 

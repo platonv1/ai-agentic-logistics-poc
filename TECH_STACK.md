@@ -7,9 +7,13 @@ What's used in this project, what it is, and where it shows up in the codebase.
 **Next.js 16 (App Router)**
 The web framework this whole app is built on — handles routing, server rendering,
 and API endpoints in one project.
-- Pages/routing: `app/page.tsx`, `app/dispatch/page.tsx`, `app/track/[orderId]/page.tsx`
+- Pages/routing: `app/page.tsx`, `app/dispatch/page.tsx` (staff sign-in),
+  `app/dispatch/console/page.tsx` (the board), `app/track/[orderId]/page.tsx`
 - API route handlers: `app/api/agents/exceptions/route.ts`,
-  `app/api/agents/dispatch/route.ts`, `app/api/agents/chat/route.ts`
+  `app/api/agents/dispatch/route.ts`, `app/api/agents/chat/route.ts`,
+  `app/api/auth/login/route.ts`, `app/api/auth/logout/route.ts`
+- Proxy (route-guarding, Next.js's renamed `middleware` convention): `proxy.ts` at
+  the project root — runs on the Node.js runtime by default in Next.js 16
 
 **React 19**
 The UI library Next.js is built on; every `.tsx` file is a React component.
@@ -66,6 +70,33 @@ directly by the agent routes. No ORM, no external DB.
 - Defined and exported from `lib/data.ts`
 - Read and mutated by all three files under `app/api/agents/`, and read directly
   by the two page server components for initial render
+
+## Authentication
+
+**jose (JWT signing/verification)**
+Issues and verifies the session token that gates the dispatch console — a real
+JWT, not just a cosmetic label. Chosen over `jsonwebtoken` because it has no
+Node-specific dependencies and is the library Next.js's own docs recommend for
+App Router auth patterns.
+- `lib/auth.ts` (`signSession`, `verifySession`) — signs an HS256 JWT containing
+  `{ username, role, displayName }`, 8-hour expiry
+- Verified on every request to `/dispatch/console`, `/api/agents/exceptions`, and
+  `/api/agents/dispatch` by `proxy.ts`
+- Secret comes from the `JWT_SECRET` env var (see `.env.example`) — a locally
+  generated random string (`openssl rand -base64 48`), not a third-party API key
+
+**Prototype accounts**
+Two hardcoded demo accounts (`staff` / `driver`, see `lib/auth.ts`) — plaintext,
+no user database, consistent with this POC's "no database" design. Documented
+openly in `USER-GUIDE.md` since this is a demo login, not a real credential
+store.
+- Login flow: `app/dispatch/LoginForm.tsx` → `POST /api/auth/login` → sets an
+  `httpOnly` cookie (`dispatch_session`) via `lib/auth.ts`'s `SESSION_COOKIE_NAME`
+- Logout: "Log out" button in `app/dispatch/DispatchBoard.tsx` →
+  `POST /api/auth/logout`, which clears the cookie
+
+The customer-facing `/track/[orderId]` pages and the `/api/agents/chat` route are
+intentionally **not** behind this gate — only the internal ops-facing surfaces are.
 
 ## Tooling
 

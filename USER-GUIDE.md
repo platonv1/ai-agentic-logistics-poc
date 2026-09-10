@@ -45,18 +45,75 @@ no config file, no signup. The app defaults to a built-in mock LLM provider, so 
 three agents (exception resolution, dispatch, customer chat) are fully interactive
 immediately:
 
-- **`/dispatch`** — click "Simulate exception" or "Add new order & dispatch" and
-  watch the agent activity log fill in with reasoning.
 - **`/track/ord-1001`** (or any seeded order id, `ord-1001`–`ord-1005`) — chat with
-  the customer support agent.
+  the customer support agent. Fully public, no login.
+- **`/dispatch`** — the ops/dispatch staff console. This one needs a one-time setup
+  step (Step 4 below) before you can sign in — see that step for why.
 
 > If port 3000 is already in use, Next.js will automatically try 3001, 3002, etc.,
 > and print the actual URL it picked — check your terminal output.
 
-This is enough to fully evaluate the app. Everything below is optional and only
-needed if you want real model responses instead of the mock.
+The customer tracking page above is enough to fully evaluate that half of the app
+with zero setup. Everything below is either required once (Step 4, for the
+dispatch console) or optional (Steps 5–6, for real model responses instead of the
+mock).
 
-## Step 4 — Turn on real Gemini responses (optional)
+## Step 4 — Sign in to the dispatch console (required for that page)
+
+The dispatch console is gated behind a real login (JWT-based), not just a label —
+this is on purpose, so it can't be confused with the public customer tracking
+page. That means, unlike the rest of the app, it needs one thing set up before you
+can use it at all.
+
+### 4a. Create your local config file (if you haven't already)
+
+```bash
+cp .env.example .env.local
+```
+
+### 4b. Generate a session-signing secret
+
+This is **not** a third-party API key — no account, no website, just a random
+string you generate yourself:
+
+```bash
+openssl rand -base64 48
+```
+
+Paste the output into `.env.local`:
+
+```
+JWT_SECRET=paste-the-random-string-here
+```
+
+Don't have `openssl`? Any long random string works — for a demo, even
+`node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"`
+does the same thing.
+
+### 4c. Restart the dev server
+
+```bash
+npm run dev
+```
+
+### 4d. Sign in
+
+Go to `/dispatch` and use one of the built-in prototype accounts:
+
+| Username | Password | Role |
+|---|---|---|
+| `staff` | `staff123` | Dispatch staff |
+| `driver` | `driver123` | Driver |
+
+These are hardcoded demo accounts (see `lib/auth.ts`) — there's no real user
+database, matching the rest of this POC's "no database" design. Don't reuse a
+real password here.
+
+If you forget this step, the login form will show
+`Server is missing JWT_SECRET` instead of crashing — that error message is your
+cue to come back and do 4a–4c.
+
+## Step 5 — Turn on real Gemini responses (optional)
 
 The mock provider is intentionally honest, not a cheat: each response is computed
 from live scenario data, just without an actual model call. To see a real LLM
@@ -145,7 +202,7 @@ when it's actually still mocked. Two ways to check:
 | `Gemini API error 503 ... high demand` | Temporary rate limiting on Google's side | Wait a few seconds and try again — the app already falls back to mock automatically so the demo isn't blocked either way |
 | `Gemini API error 400` | Malformed request or an invalid/revoked key | Double-check you copied the whole key with no extra characters |
 
-## Step 5 — Use a local model instead (optional)
+## Step 6 — Use a local model instead (optional)
 
 If you'd rather not use a cloud API at all, you can point the app at a local
 [Ollama](https://ollama.com) server:
@@ -175,9 +232,13 @@ Press `Ctrl+C` in the terminal where `npm run dev` is running.
 git clone https://github.com/platonv1/ai-agentic-logistics-poc.git
 cd ai-agentic-logistics-poc
 npm install
-npm run dev                    # zero-setup, mock provider — done here for most uses
+npm run dev                    # zero-setup, mock provider — /track works immediately
 
-# optional: real Gemini
-cp .env.example .env.local     # then edit LLM_PROVIDER and GEMINI_API_KEY in it
-npm run dev                    # restart to pick up the change
+# required, but only for /dispatch:
+cp .env.example .env.local
+openssl rand -base64 48        # paste the output as JWT_SECRET= in .env.local
+npm run dev                    # restart, then sign in at /dispatch with staff/staff123
+
+# optional: real Gemini instead of mock
+# edit LLM_PROVIDER and GEMINI_API_KEY in .env.local, then restart again
 ```
