@@ -1,7 +1,9 @@
+import Link from "next/link";
 import { orders } from "@/lib/data";
+import OrderLookupForm from "./OrderLookupForm";
 
 export default function Home() {
-  const sampleOrderId = orders[0]?.id ?? "ord-1001";
+  const sampleOrderIds = orders.slice(0, 3).map((o) => o.id);
 
   return (
     <main className="mx-auto flex max-w-2xl flex-1 flex-col items-start justify-center gap-6 px-6 py-24">
@@ -16,19 +18,36 @@ export default function Home() {
         agents: exception resolution, dynamic dispatch &amp; route
         optimization, and proactive customer communication.
       </p>
-      <div className="flex flex-col gap-3 sm:flex-row">
-        <a
-          href="/dispatch"
-          className="rounded bg-black px-5 py-3 text-sm font-medium text-white"
-        >
-          Open dispatch console
-        </a>
-        <a
-          href={`/track/${sampleOrderId}`}
-          className="rounded border border-gray-300 px-5 py-3 text-sm font-medium"
-        >
-          Open customer tracking
-        </a>
+
+      <a
+        href="/dispatch"
+        className="rounded bg-black px-5 py-3 text-sm font-medium text-white"
+      >
+        Open dispatch console
+      </a>
+
+      <div className="mt-2 w-full border-t border-gray-200 pt-6">
+        <h2 className="text-sm font-semibold text-gray-700">
+          Track a delivery
+        </h2>
+        <p className="mt-1 text-sm text-gray-500">
+          Enter an order number to open the customer tracking &amp; chat page.
+        </p>
+        <div className="mt-3">
+          <OrderLookupForm />
+        </div>
+        <p className="mt-3 text-xs text-gray-400">
+          No order number handy? Try{" "}
+          {sampleOrderIds.map((id, i) => (
+            <span key={id}>
+              <Link href={`/track/${id}`} className="text-blue-600 underline">
+                {id}
+              </Link>
+              {i < sampleOrderIds.length - 1 ? ", " : ""}
+            </span>
+          ))}
+          .
+        </p>
       </div>
     </main>
   );
